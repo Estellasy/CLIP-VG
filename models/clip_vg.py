@@ -321,6 +321,7 @@ class ML_CLIP_VG_PROMPT(nn.Module):
 class CLIP_VG(nn.Module):
     def __init__(self, args):
         super(CLIP_VG, self).__init__()
+        # 加载ViT模型
         self.clip, _ = clip.load("ViT-B/16", device=args.device)
         for parameter in self.clip.parameters():
             parameter.requires_grad_(False)
