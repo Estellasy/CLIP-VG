@@ -6,20 +6,26 @@ from utils.box_utils import bbox_iou, xywh2xyxy, xyxy2xywh, generalized_box_iou
 from utils.misc import get_world_size
 
 
+# 构建YOLO格式目标
 def build_target(args, gt_bbox, pred, device):
     batch_size = gt_bbox.size(0)
     num_scales = len(pred)
+    # 初始化列表存储不同尺度的信息
     coord_list, bbox_list = [], []
+    # 对每个尺度进行处理
     for scale_ii in range(num_scales):
+        # 计算网格大小
         this_stride = 32 // (2 ** scale_ii)
         grid = args.size // this_stride
         # Convert [x1, y1, x2, y2] to [x_c, y_c, w, h]
+        # 转换边界框格式
         center_x = (gt_bbox[:, 0] + gt_bbox[:, 2]) / 2
         center_y = (gt_bbox[:, 1] + gt_bbox[:, 3]) / 2
         box_w = gt_bbox[:, 2] - gt_bbox[:, 0]
         box_h = gt_bbox[:, 3] - gt_bbox[:, 1]
         coord = torch.stack((center_x, center_y, box_w, box_h), dim=1)
         # Normalized by the image size
+        # 归一化并缩放到网格尺度
         coord = coord / args.size
         coord = coord * grid
         coord_list.append(coord)
@@ -82,18 +88,22 @@ def yolo_loss(pred_list, target, gi, gj, best_n_list, device, w_coord=5., w_neg=
     num_scale = len(pred_list)
     batch_size = pred_list[0].size(0)
 
+    # 初始化预测和真实边界框
     pred_bbox = torch.zeros(batch_size, 4).to(device)
     gt_bbox = torch.zeros(batch_size, 4).to(device)
+    # 遍历每个样本
     for ii in range(batch_size):
         pred_bbox[ii, 0:2] = torch.sigmoid(
             pred_list[best_n_list[ii] // 3][ii, best_n_list[ii] % 3, 0:2, gj[ii], gi[ii]])
         pred_bbox[ii, 2:4] = pred_list[best_n_list[ii] // 3][ii, best_n_list[ii] % 3, 2:4, gj[ii], gi[ii]]
         gt_bbox[ii, :] = target[best_n_list[ii] // 3][ii, best_n_list[ii] % 3, :4, gj[ii], gi[ii]]
+    # 计算坐标损失
     loss_x = mseloss(pred_bbox[:, 0], gt_bbox[:, 0])
     loss_y = mseloss(pred_bbox[:, 1], gt_bbox[:, 1])
     loss_w = mseloss(pred_bbox[:, 2], gt_bbox[:, 2])
     loss_h = mseloss(pred_bbox[:, 3], gt_bbox[:, 3])
 
+    # 计算置信度损失
     pred_conf_list, gt_conf_list = [], []
     for scale_ii in range(num_scale):
         pred_conf_list.append(pred_list[scale_ii][:, :, 4, :, :].contiguous().view(batch_size, -1))
@@ -108,17 +118,20 @@ def trans_vg_loss(batch_pred, batch_target):
     """Compute the losses related to the bounding boxes, 
        including the L1 regression loss and the GIoU loss
     """
-
+    # Transformer视觉定位损失
     batch_size = batch_pred.shape[0]
     # world_size = get_world_size()
     num_boxes = batch_size
 
+    # L1损失：直接回归坐标差异
     loss_bbox = F.l1_loss(batch_pred, batch_target, reduction='none')
+    # GIoU损失：计算预测框与真实框的GIoU
     loss_giou = 1 - torch.diag(generalized_box_iou(
         xywh2xyxy(batch_pred),
         xywh2xyxy(batch_target)
     ))
-
+    
+    # 计算平均损失
     losses = {}
     losses['loss_bbox'] = loss_bbox.sum() / num_boxes
     losses['loss_giou'] = loss_giou.sum() / num_boxes

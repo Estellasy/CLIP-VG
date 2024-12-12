@@ -28,7 +28,7 @@ def train_one_epoch(args, model: torch.nn.Module, data_loader: Iterable,
 
     # data processing
     for batch in metric_logger.log_every(data_loader, print_freq, header):
-        img_data, text_data, target = batch
+        img_data, text_data, target = batch # 如何获取到text_data 针对target设计一种dataloader方式
 
         # copy to GPU
         img_data = img_data.to(device)
@@ -36,8 +36,10 @@ def train_one_epoch(args, model: torch.nn.Module, data_loader: Iterable,
         target = target.to(device)
 
         # model forward
+        # 这里模型前向传播的输出是什么？
         output = model(img_data, text_data)
-
+        
+        # 详细损失计算过程 这里是GIOU损失吗？
         loss_dict = loss_utils.trans_vg_loss(output, target)
         losses = sum(loss_dict[k] for k in loss_dict.keys())
 

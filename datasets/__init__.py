@@ -56,6 +56,7 @@ def make_transforms(args, image_set, is_onestage=False):
     raise ValueError(f'unknown {image_set}')
 
 
+# 数据集构建 需要详细看
 def build_dataset(split, args):
     return TransVGDataset(data_root=args.data_root,
                           split_root=args.split_root,
